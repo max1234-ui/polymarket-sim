@@ -31,25 +31,25 @@ newpage = load("newpage.png")
 
 ie_rect = ie.get_rect(topleft=(30, 30))
 
-TAB_X, TAB_Y, TAB_GAP, MAX_TABS = 10, 6, 2, 6
+TAB_X, TAB_Y, TAB_GAP, MAX_TABS = 10, 6, 2, 15
 tab_dim = tab.copy()
 tab_dim.set_alpha(150)
+
+plus_rect = plus.get_rect(topleft=(10, 50))
+cross_rect = cross.get_rect(topleft=(plus_rect.right + 6, 50))
 
 browser_open = False
 tabs = []
 current = 0
+dragging = None
+grab_dx = 0
+drag_x = 0
+STEP = tab.get_width() + TAB_GAP
 
 ####main loop #####
 while True:
     clock.tick(60)
-    tab_rects = []
-    cross_rects = []
-    for i in range(len(tabs)):
-        r = tab.get_rect(topleft=(TAB_X + i * (tab.get_width() + TAB_GAP), TAB_Y))
-        tab_rects.append(r)
-        cross_rects.append(cross.get_rect(midright=(r.right - 6, r.centery)))
-    plus_X = TAB_X + len(tabs) * (tab.get_width() + TAB_GAP) + 4
-    plus_rect = plus.get_rect(midleft=(plus_X, TAB_Y + tab.get_height() // 2))
+    tab_rects = [tab.get_rect(topleft=(TAB_X + i * STEP, TAB_Y)) for i in range (len(tabs))]
     
     for e in pygame.event.get():
         if e.type == pygame.QUIT:
@@ -61,41 +61,52 @@ while True:
                     browser_open = True
                     tabs = [page]
                     current = 0
-            elif len(tabs) < MAX_TABS and plus_rect.collidepoint(e.pos):
-                tabs.append(newpage)
-                current = len(tabs) - 1
+            elif plus_rect.collidepoint(e.pos):
+                if len(tabs) < MAX_TABS:
+                    tabs.append(newpage)
+                    current = len(tabs) - 1
+            elif cross_rect.collidepoint(e.pos):
+                tabs.pop(current)
+                if not tabs:
+                    browser_open = False
+                else:
+                    current = min(current, len(tabs) - 1)
             else:
                 for i in range(len(tabs)):
-                    if cross_rects[i].collidepoint(e.pos):
-                        tabs.pop(i)
-                        if not tabs:
-                            browser_open = False
-                        elif i < current:
-                            current -= 1
-                        else:
-                            current = min(current, len(tabs) - 1)
-                        break
                     if tab_rects[i].collidepoint(e.pos):
                         current = i
+                        dragging = i
+                        grab_dx = e.pos[0] - tab_rects[i].x
+                        drag_x = tab_rects[i].x
                         break
+        if e.type == pygame.MOUSEMOTION and dragging is not None:
+            drag_x = e.pos[0] - grab_dx
+            drag_x = max(TAB_X, min(drag_x, TAB_X + (len(tabs) - 1) * STEP))
+            target = round((drag_x - TAB_X) / STEP)
+            if target != dragging:
+                tabs.insert(target, tabs.pop(dragging))
+                dragging = target
+                current = target
+        if e.type == pygame.MOUSEBUTTONUP and e.button == 1:
+            dragging = None
+    tab_rects = [tab.get_rect(topleft=(TAB_X + i * STEP, TAB_Y)) for i in range(len(tabs))]
 
-    tab_rects = []
-    cross_rects = []
-    for i in range(len(tabs)):
-        r = tab.get_rect(topleft=(TAB_X + i * (tab.get_width() + TAB_GAP), TAB_Y))
-        tab_rects.append(r)
-        cross_rects.append(cross.get_rect(midright=(r.right - 6, r.centery)))
-    plus_X = TAB_X + len(tabs) * (tab.get_width() + TAB_GAP) + 4
-    plus_rect = plus.get_rect(midleft=(plus_X, TAB_Y + tab.get_height() // 2))
-    
+    if dragging is not None:
+        tab_rects[dragging].x = drag_x
+        
+
     screen.blit(background, (0, 0))
     screen.blit(ie, ie_rect)
     if browser_open:
         screen.blit(tabs[current], (0, 0))
-        for i in range (len(tabs)):
+        order = [i for i in range(len(tabs)) if i != dragging]
+        if dragging is not None:
+            order.append(dragging)
+        for i in order:
             screen.blit(tab if i == current else tab_dim, tab_rects[i])
-            screen.blit(cross, cross_rects[i])
-        if len(tabs) < MAX_TABS:
-            screen.blit(plus, plus_rect)
+        
+
+        screen.blit(plus, plus_rect)
+        screen.blit(cross, cross_rect)
 
     pygame.display.flip()
