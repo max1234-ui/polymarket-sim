@@ -1,6 +1,8 @@
 import pygame, json, math, os, sys
 from pathlib import Path
 
+
+
 WIDTH = 1280
 HEIGHT = 720
 
@@ -16,7 +18,6 @@ pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("")
 clock = pygame.time.Clock()
-
 #######asset loading########
 
 background = load("bg.png")
@@ -26,6 +27,11 @@ cross = load("cross.png")
 plus = load("plus.png")
 tab = load("tab.png")
 newpage = load("newpage.png")
+back = load("back.png")
+cards = [load("card_market.png"), load("card_wiki.png")]
+sites = [load("market.png"), load("wiki.png")]
+join = load("join.png")
+join_rect = join.get_rect(center=(WIDTH // 2, HEIGHT // 2))
 
 #######postiions#######
 
@@ -37,13 +43,14 @@ tab_dim.set_alpha(150)
 
 plus_rect = plus.get_rect(topleft=(10, 50))
 cross_rect = cross.get_rect(topleft=(plus_rect.right + 6, 50))
+back_rect = back.get_rect(topleft=(10, 120))
+card_rects = [cards[i].get_rect(topleft=(100 + i * 380, 200)) for i in range(len(cards))]
 
 browser_open = False
 tabs = []
 current = 0
 dragging = None
 grab_dx = 0
-drag_x = 0
 STEP = tab.get_width() + TAB_GAP
 
 ####main loop #####
@@ -71,6 +78,12 @@ while True:
                     browser_open = False
                 else:
                     current = min(current, len(tabs) - 1)
+            elif tabs[current] is page and any(r.collidepoint(e.pos) for r in card_rects):
+                for i in range(len(cards)):
+                    if card_rects[i].collidepoint(e.pos):
+                        tabs[current] = sites[i]
+            elif any(tabs[current] is s for s in sites) and back_rect.collidepoint(e.pos):
+                tabs[current] = page
             else:
                 for i in range(len(tabs)):
                     if tab_rects[i].collidepoint(e.pos):
@@ -99,6 +112,15 @@ while True:
     screen.blit(ie, ie_rect)
     if browser_open:
         screen.blit(tabs[current], (0, 0))
+        if tabs[current] is page:
+            for i in range(len(cards)):
+                screen.blit(cards[i], card_rects[i])
+        elif any(tabs[current] is s for s in sites):
+            screen.blit(back, back_rect)
+            if tabs[current] is sites[0]:
+                screen.blit(join, join_rect)
+
+
         order = [i for i in range(len(tabs)) if i != dragging]
         if dragging is not None:
             order.append(dragging)
