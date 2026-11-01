@@ -1,134 +1,181 @@
-import pygame, json, math, os, sys
-from pathlib import Path
+# -*- coding: utf-8 -*-
 
 
-
-WIDTH = 1280
-HEIGHT = 720
+import pygame, random, os, sys
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 
-def load(img):
-    path = os.path.join(BASE, "assets", img)
+def load_img(img):                                  #Good idea brother
+    path = os.path.join(BASE, r"assets\images", img)
     if not os.path.exists(path):
         sys.exit("missing asset" + path)
     return pygame.image.load(path).convert_alpha()
 
+class Player:
+    def __init__(self):
+        self.luck = 0
+        self.cash = 100
+
+class Shop:                     # Theoretical
+    def __init__(self):
+        self.upgrades = {} #Just checks if they are purchased + price
+        self.predictions = {} #Same here
+
+class State:
+    def __init__(self, resolution):
+        self.state = "room"         # Possible states : "room", "Living_room", "sofa", "pc"
+        self.pc_state = "main"      # Possible state : "main", "polski_tunes", "polski_market", "settings"
+        self.bright_sprite = [None, None]
+        self.resolution = resolution
+        self.interactibles_per_location = {"room" : ["computer","room_door"] , "living_room": ["living_room_door", "sofa"]}
+        self.masks = {"room" : {"computer" : None, "room_door" : None}, "living_room" : {"living_room_door" : None, "sofa" : None}}
+
+
+    def draw_screen(self, screen, image_dict):
+        screen.blit(image_dict["background"][self.state], (0,0))
+
+        if self.state == "pc":
+            pass
+        else:
+            self.draw_interactible(screen, image_dict)
+
+        
+
+    def draw_interactible(self, screen, image_dict):
+        for image in self.interactibles_per_location[self.state]:
+            screen.blit(image_dict["interactible"][image],(0,0))
+
+    def update_resolution(self, image_dict, original_image_dict):
+        coef = self.resolution[0]/1920
+
+        for key_1 in image_dict.keys():
+            for key_2 in image_dict[key_1]:
+                image_dict[key_1][key_2] = pygame.transform.scale(original_image_dict[key_1][key_2], self.resolution)
+
+        for key_1 in self.masks.keys():
+            for key_2 in self.masks[key_1].keys():
+                try:
+                    self.masks[key_1][key_2] = pygame.mask.from_surface(image_dict["interactible"][key_2])
+                except:
+                    print("missing image")
+
+    def check_interact_collision(self, mouse_pos):
+        for key, mask in self.masks[self.state].items():
+            if mask.get_at(mouse_pos):
+                return key
+        return None
+
+    def update_bright_sprite(self, selected, image_dict):
+        self.bright_sprite[0] = selected
+        if self.bright_sprite[0] is None:
+            return
+        brite = image_dict["interactible"][self.bright_sprite[0]].copy()
+        brite.fill((80, 80, 80), special_flags=pygame.BLEND_RGB_ADD)
+        self.bright_sprite[1] = brite
+
+    def draw_bright_sprite(self, screen):
+        screen.blit(self.bright_sprite[1], (0,0))
+
+    def room_interactible_action(self, selected):
+        if selected == "room_door":
+            self.state = "living_room"
+        elif selected == "living_room_door":
+            self.state = "room"
+        elif selected == "computer":
+            self.state = "pc"
+        else:
+            self.state = "sofa"
+
+
 pygame.init()
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("")
 clock = pygame.time.Clock()
-#######asset loading########
 
-background = load("bg.png")
-ie = load("ie.png")
-page = load("page.png")
-cross = load("cross.png")
-plus = load("plus.png")
-tab = load("tab.png")
-newpage = load("newpage.png")
-back = load("back.png")
-cards = [load("card_market.png"), load("card_wiki.png")]
-sites = [load("market.png"), load("wiki.png")]
-join = load("join.png")
-join_rect = join.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+screen_resolutions = [(1920, 1080),(1280, 720), (854, 480), (640, 360)]
 
-#######postiions#######
+display_size = pygame.display.get_desktop_sizes()[0]
 
-ie_rect = ie.get_rect(topleft=(30, 30))
+window_size = (1920, 1080)
 
-TAB_X, TAB_Y, TAB_GAP, MAX_TABS = 10, 6, 2, 15
-tab_dim = tab.copy()
-tab_dim.set_alpha(150)
+for resolution in screen_resolutions:
+    if display_size <= resolution:
+        window_size = resolution
+    else:
+        break
 
-plus_rect = plus.get_rect(topleft=(10, 50))
-cross_rect = cross.get_rect(topleft=(plus_rect.right + 6, 50))
-back_rect = back.get_rect(topleft=(10, 120))
-card_rects = [cards[i].get_rect(topleft=(100 + i * 380, 200)) for i in range(len(cards))]
+size_coefficient = window_size[0]/1920
 
-browser_open = False
-tabs = []
-current = 0
-dragging = None
-grab_dx = 0
-STEP = tab.get_width() + TAB_GAP
+window = pygame.display.set_mode(window_size)
 
-####main loop #####
-while True:
+pc_window = pygame.Surface((1280*size_coefficient, 720*size_coefficient))
+
+fonts = {"interact_font" : pygame.font.SysFont(None, 30, True)}
+original_images = { "background" : {    "room" : load_img("room_bg.png"), 
+                                        "living_room" : load_img("living_room_bg.png"),
+                                        "pc" : load_img("pc_bg.png")}, 
+                                   
+                    "interactible" : {  "computer" : load_img("computer.png"), 
+                                        "room_door" : load_img("room_door.png"), 
+                                        "sofa" : load_img("sofa.png"),
+                                        "living_room_door" : load_img("living_room_door.png")}}
+
+images = {  "background" : {    "room" : None, 
+                                "living_room" : None,
+                                "pc" : None}, 
+                                   
+            "interactible" : {  "computer" : None, 
+                                "room_door" : None, 
+                                "sofa" : None,
+                                "living_room_door" : None}}
+
+import pc
+
+player = Player()
+current_state = State(window_size)
+
+current_state.update_resolution(images, original_images)
+
+running = True
+
+while running:
     clock.tick(60)
-    tab_rects = [tab.get_rect(topleft=(TAB_X + i * STEP, TAB_Y)) for i in range (len(tabs))]
+    mx, my = pygame.mouse.get_pos()
+
+    if current_state.state != "pc":
+        selected_interactible = current_state.check_interact_collision((mx, my))
+        if selected_interactible != current_state.bright_sprite[0]:
+            current_state.update_bright_sprite(selected_interactible, images) 
+    else:
+        current_state.bright_sprite[0] = None
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        if current_state.state != "pc":
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if selected_interactible is not None:
+                    current_state.room_interactible_action(selected_interactible)
+
     
-    for e in pygame.event.get():
-        if e.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-        if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
-            if not browser_open:
-                if ie_rect.collidepoint(e.pos):
-                    browser_open = True
-                    tabs = [page]
-                    current = 0
-            elif plus_rect.collidepoint(e.pos):
-                if len(tabs) < MAX_TABS:
-                    tabs.append(newpage)
-                    current = len(tabs) - 1
-            elif cross_rect.collidepoint(e.pos):
-                tabs.pop(current)
-                if not tabs:
-                    browser_open = False
-                else:
-                    current = min(current, len(tabs) - 1)
-            elif tabs[current] is page and any(r.collidepoint(e.pos) for r in card_rects):
-                for i in range(len(cards)):
-                    if card_rects[i].collidepoint(e.pos):
-                        tabs[current] = sites[i]
-            elif any(tabs[current] is s for s in sites) and back_rect.collidepoint(e.pos):
-                tabs[current] = page
-            else:
-                for i in range(len(tabs)):
-                    if tab_rects[i].collidepoint(e.pos):
-                        current = i
-                        dragging = i
-                        grab_dx = e.pos[0] - tab_rects[i].x
-                        drag_x = tab_rects[i].x
-                        break
-        if e.type == pygame.MOUSEMOTION and dragging is not None:
-            drag_x = e.pos[0] - grab_dx
-            drag_x = max(TAB_X, min(drag_x, TAB_X + (len(tabs) - 1) * STEP))
-            target = round((drag_x - TAB_X) / STEP)
-            if target != dragging:
-                tabs.insert(target, tabs.pop(dragging))
-                dragging = target
-                current = target
-        if e.type == pygame.MOUSEBUTTONUP and e.button == 1:
-            dragging = None
-    tab_rects = [tab.get_rect(topleft=(TAB_X + i * STEP, TAB_Y)) for i in range(len(tabs))]
 
-    if dragging is not None:
-        tab_rects[dragging].x = drag_x
-        
+    
 
-    screen.blit(background, (0, 0))
-    screen.blit(ie, ie_rect)
-    if browser_open:
-        screen.blit(tabs[current], (0, 0))
-        if tabs[current] is page:
-            for i in range(len(cards)):
-                screen.blit(cards[i], card_rects[i])
-        elif any(tabs[current] is s for s in sites):
-            screen.blit(back, back_rect)
-            if tabs[current] is sites[0]:
-                screen.blit(join, join_rect)
+    window.fill({"room" : (46, 140, 120), "living_room" : (78, 80, 116), "pc" : (46, 140, 120), "sofa" : (78, 80, 116)}[current_state.state])
+    current_state.draw_screen(window, images)
 
+    if current_state.state == "pc":
+                pc_window.fill((255,255,255))
+                window.blit(pc_window, (333*size_coefficient, 116*size_coefficient))
+                
+                pc.run(pc_window)
+                
+                current_state.state = "room"
 
-        order = [i for i in range(len(tabs)) if i != dragging]
-        if dragging is not None:
-            order.append(dragging)
-        for i in order:
-            screen.blit(tab if i == current else tab_dim, tab_rects[i])
-        
+    
+    
 
-        screen.blit(plus, plus_rect)
-        screen.blit(cross, cross_rect)
+    if current_state.bright_sprite[0] is not None:
+            current_state.draw_bright_sprite(window)
 
     pygame.display.flip()
+
+pygame.quit()
