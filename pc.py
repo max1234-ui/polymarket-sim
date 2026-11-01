@@ -27,7 +27,50 @@ class Button:
 
     def draw(self, canvas, mouse):
         canvas.blit(self.bright if self.hit(mouse) else self.img, self.rect)
-        
+
+class Bank:
+    RATE, MAX_DEBT = 0.3, 2000
+    LOANS = (("loan_100.png", 100), ("loan_500.png", 500), ("loan_1000.png", 1000))
+    REPAY = (("repay_100.png", 100), ("repay_500.png", 500), ("repay_1000.png", 1000))
+
+    def __init__(self, font):
+        self.font = font
+        self.loan_btns = [(Button(f, (90, 220 + i * 80)), a) for i, (f, a) in enumerate(self.LOANS)]
+        self.repay_btns = [(Button(f, (500, 220 + i * 80)), a) for i, (f, a) in enumerate(self.REPAY)]
+
+    def borrow(self, player, amount):
+        if player.debt + amount <= self.MAX_DEBT:
+            player.cash += amount
+            player.debt += amount
+
+    def repay(self, player, amount):
+        amount = min(amount or player.debt, player.debt, player.cash)
+        player.cash -= amount
+        player.debt -= amount
+
+    def end_day(self, player):
+        player.debt = round(player.debt * (1 + self.RATE))
+
+    def click(self, pos, player):
+        for btn, amount in self.loan_btns:
+            if btn.hit(pos):
+                self.borrow(player, amount)
+                return True
+        for btn, amount in self.repay_btns:
+            if btn.hit(pos):
+                self.repay(player, amount)
+                return True
+        return False
+
+    def text(self, canvas, s, pos):
+        canvas.blit(self.font.render(s, True, (0, 0, 0)), pos)
+
+    def draw(self, canvas, mouse, player):
+        for btn, _ in self.loan_btns + self.repay_btns:
+            btn.draw(canvas, mouse)
+        self.text(canvas, f"{player.cash}",(90, 665))
+        self.text(canvas, f"Debt: {player.debt}", (90, 150))
+        self.text(canvas, f"REPAY        Interest: {int(self.RATE * 100)}% per day", (500, 150))
 
 class Browser:
     TAB_X, TAB_Y, TAB_GAP, MAX_TABS = 10, 6, 2, 15
@@ -47,6 +90,7 @@ class Browser:
         self.step = self.tab.get_width() + self.TAB_GAP
         self.player = None
         self.font = pygame.font.SysFont(None, 60, True)
+        self.bank = Bank(self.font)
 
         self.open = False
         self.tabs = []
@@ -78,18 +122,25 @@ class Browser:
     def click(self, pos):
         cur = self.tabs[self.current]
         card = next((s for c, s in zip(self.cards, self.sites) if c.hit(pos)), None)
+
         if self.plus.hit(pos):
             if len(self.tabs) < self.MAX_TABS:
                 self.tabs.append(self.page)
                 self.current = len(self.tabs) - 1
+
         elif self.cross.hit(pos):
             self.tabs.pop(self.current)
             self.open = bool(self.tabs)
+
             self.current = min(self.current, len(self.tabs) - 1)
         elif cur is self.page and card is not None:
             self.tabs[self.current] = card
+
         elif cur in self.sites and self.back.hit(pos):
             self.tabs[self.current] = self.page
+
+        elif cur is self.sites[2] and self.bank.click(pos, self.player):
+            pass
         else:
             self.pick_tab(pos)
 
@@ -118,8 +169,7 @@ class Browser:
             if cur is self.sites[0]:
                 self.join.draw(canvas, mouse)
             if cur is self.sites[2]:
-                text = self.font.render(f"{self.player.cash}", True, (0, 0, 0))
-                canvas.blit(text, (90, 665))
+                self.bank.draw(canvas, mouse, self.player)
         rects = self.tab_rects()
         order = [i for i in range(len(self.tabs)) if i != self.dragging] + ([self.dragging] if self.dragging is not None else [])
         for i in order:
@@ -151,7 +201,7 @@ class Monitor:
         self.size = (int(WIDTH * self.coeff), int(HEIGHT * self.coeff))
 
     def to_desktop(self, pos):
-        return (int(pos[0] - self.pos[0]) / self.coeff, int(pos[1] - self.pos[1]) / self.coeff)
+        return (int((pos[0] - self.pos[0]) / self.coeff), int((pos[1] - self.pos[1]) / self.coeff))
 
 OUTSIDE = load("pc_bg.png")
 clock, desktop = pygame.time.Clock(), Desktop()
@@ -161,6 +211,7 @@ def run(screen, player):
     monitor, desktop.player = Monitor(screen), player
     desktop.browser.player = player
     while True:
+        player.debt = getattr(player, "debt", 0)
         clock.tick(60)
         for e in pygame.event.get():
             if e.type == pygame.QUIT:
