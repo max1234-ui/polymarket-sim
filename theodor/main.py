@@ -1,14 +1,25 @@
 # -*- coding: utf-8 -*-
 
 
-import pygame, random, os
+import pygame, random, os, sys
 
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+BASE = os.path.dirname(os.path.abspath(__file__))
+
+def load_img(img):                                  #Good idea brother
+    path = os.path.join(BASE, r"assets\images", img)
+    if not os.path.exists(path):
+        sys.exit("missing asset" + path)
+    return pygame.image.load(path).convert_alpha()
 
 class Player:
     def __init__(self):
         self.luck = 0
         self.cash = 100
+
+class Shop:                     # Theoretical
+    def __init__(self):
+        self.upgrades = {} #Just checks if they are purchased + price
+        self.predictions = {} #Same here
 
 class State:
     def __init__(self, resolution):
@@ -22,10 +33,13 @@ class State:
 
     def draw_screen(self, screen, image_dict):
         screen.blit(image_dict["background"][self.state], (0,0))
+
         if self.state == "pc":
             pass
+        else:
+            self.draw_interactible(screen, image_dict)
 
-        self.draw_interactible(screen, image_dict)
+        
 
     def draw_interactible(self, screen, image_dict):
         for image in self.interactibles_per_location[self.state]:
@@ -93,22 +107,23 @@ for resolution in screen_resolutions:
 window = pygame.display.set_mode(window_size)
 
 fonts = {"interact_font" : pygame.font.SysFont(None, 30, True)}
-original_images = { "background" : {    "room" : pygame.image.load("assets/images/room_bg.png").convert_alpha(), 
-                                        "living_room" : pygame.image.load("assets/images/living_room_bg.png").convert_alpha()}, 
+original_images = { "background" : {    "room" : load_img("room_bg.png"), 
+                                        "living_room" : load_img("living_room_bg.png"),
+                                        "pc" : load_img("pc_bg.png")}, 
                                    
-                    "interactible" : {  "computer" : pygame.image.load("assets/images/computer.png").convert_alpha(), 
-                                        "room_door" : pygame.image.load("assets/images/room_door.png").convert_alpha(), 
-                                        "sofa" : pygame.image.load("assets/images/sofa.png").convert_alpha(),
-                                        "living_room_door" : pygame.image.load("assets/images/living_room_door.png").convert_alpha()}}
+                    "interactible" : {  "computer" : load_img("computer.png"), 
+                                        "room_door" : load_img("room_door.png"), 
+                                        "sofa" : load_img("sofa.png"),
+                                        "living_room_door" : load_img("living_room_door.png")}}
 
-images = {  "background" : {    "room" : pygame.image.load("assets/images/room_bg.png").convert_alpha(), 
-                                "living_room" : pygame.image.load("assets/images/living_room_bg.png").convert_alpha()}, 
+images = {  "background" : {    "room" : None, 
+                                "living_room" : None,
+                                "pc" : None}, 
                                    
-            "interactible" : {  "computer" : pygame.image.load("assets/images/computer.png").convert_alpha(), 
-                                "room_door" : pygame.image.load("assets/images/room_door.png").convert_alpha(), 
-                                "sofa" : pygame.image.load("assets/images/sofa.png").convert_alpha(),
-                                "living_room_door" : pygame.image.load("assets/images/living_room_door.png").convert_alpha()}}
-
+            "interactible" : {  "computer" : None, 
+                                "room_door" : None, 
+                                "sofa" : None,
+                                "living_room_door" : None}}
 
 
 player = Player()
@@ -122,20 +137,23 @@ while running:
     clock.tick(60)
     mx, my = pygame.mouse.get_pos()
 
-    selected_interactible = current_state.check_interact_collision((mx, my))
-    if selected_interactible != current_state.bright_sprite[0]:
-        current_state.update_bright_sprite(selected_interactible, images)
+    if current_state.state != "pc":
+        selected_interactible = current_state.check_interact_collision((mx, my))
+        if selected_interactible != current_state.bright_sprite[0]:
+            current_state.update_bright_sprite(selected_interactible, images) 
+    else:
+        current_state.bright_sprite[0] = None
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        if current_state.state != "pc":
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if selected_interactible is not None:
+                    current_state.room_interactible_action(selected_interactible)
 
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if selected_interactible is not None:
-                current_state.room_interactible_action(selected_interactible)
 
-
-    window.fill({"room" : (46, 140, 120), "living_room" : (78, 80, 116), "pc" : (46, 140, 120), "sofa" : (138, 114, 128)}[current_state.state])
+    window.fill({"room" : (46, 140, 120), "living_room" : (78, 80, 116), "pc" : (46, 140, 120), "sofa" : (78, 80, 116)}[current_state.state])
 
     current_state.draw_screen(window, images)
     if current_state.bright_sprite[0] is not None:
