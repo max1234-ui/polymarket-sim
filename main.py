@@ -140,20 +140,19 @@ while running:
     clock.tick(60)
     mx, my = pygame.mouse.get_pos()
 
-    if current_state.state != "pc":
-        selected_interactible = current_state.check_interact_collision((mx, my))
-        if selected_interactible != current_state.bright_sprite[0]:
-            current_state.update_bright_sprite(selected_interactible, images) 
-    else:
-        current_state.bright_sprite[0] = None
+    
+    selected_interactible = current_state.check_interact_collision((mx, my))
+    if selected_interactible != current_state.bright_sprite[0]:
+        current_state.update_bright_sprite(selected_interactible, images) 
+    
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        if current_state.state != "pc":
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if selected_interactible is not None:
-                    current_state.room_interactible_action(selected_interactible)
+        
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if selected_interactible is not None:
+                current_state.room_interactible_action(selected_interactible)
 
     
 
@@ -166,10 +165,9 @@ while running:
                 pc_window.fill((255,255,255))
                 window.blit(pc_window, (333*size_coefficient, 116*size_coefficient))
                 
-                pc.run(pc_window)
+                pc.run(window, player)
                 
                 current_state.state = "room"
-
     
     
 
@@ -177,5 +175,7 @@ while running:
             current_state.draw_bright_sprite(window)
 
     pygame.display.flip()
+
+pygame.quit()
 
 pygame.quit()
