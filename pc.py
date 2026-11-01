@@ -27,6 +27,75 @@ class Button:
 
     def draw(self, canvas, mouse):
         canvas.blit(self.bright if self.hit(mouse) else self.img, self.rect)
+
+class Bank:
+    RATE, MAX_DEBT = 0.3, 2000
+    LOANS = (("loan_100.png", 100), ("loan_500.png", 500), ("loan_1000.png", 1000))
+    REPAY = (("repay_100.png", 100), ("repay_500.png", 500), ("repay_1000.png", 1000))
+
+    def __init__(self, font):
+        self.font = font
+        self.loan_btns = [(Button(f, (90, 220 + i * 80)), a) for i, (f, a) in enumerate(self.LOANS)]
+        self.repay_btns = [(Button(f, (500, 220 + i * 80)), a) for i, (f, a) in enumerate(self.REPAY)]
+
+    def borrow(self, player, amount):
+        if player.debt + amount <= self.MAX_DEBT:
+            player.cash += amount
+            player.debt += amount
+
+    def repay(self, player, amount):
+        amount = min(amount or player.debt, player.debt, player.cash)
+        player.cash -= amount
+        player.debt -= amount
+
+    def end_day(self, player):
+        player.debt = round(player.debt * (1 + self.RATE))
+
+    def click(self, pos, player):
+        for btn, amount in self.loan_btns:
+            if btn.hit(pos):
+                self.borrow(player, amount)
+                return True
+        for btn, amount in self.repay_btns:
+            if btn.hit(pos):
+                self.repay(player, amount)
+                return True
+        return False
+
+    def text(self, canvas, s, pos):
+        canvas.blit(self.font.render(s, True, (0, 0, 0)), pos)
+
+    def draw(self, canvas, mouse, player):
+        for btn, _ in self.loan_btns + self.repay_btns:
+            btn.draw(canvas, mouse)
+        self.text(canvas, f"{player.cash}",(90, 665))
+        self.text(canvas, f"Debt: {player.debt}", (90, 150))
+        self.text(canvas, f"REPAY        Interest: {int(self.RATE * 100)}% per day", (500, 150))
+
+class Shop:
+    ITEMS = (("item_lamp.png", "lamp", 50), ("item_chair.png", "chair", 100), ("item_tv.png", "tv", 250))
+
+    def __init__(self, font):
+        self.font = font
+        self.buttons = [(Button(f, (90 + i * 380, 250)), name, price) for i,  (f, name, price)in enumerate(self.ITEMS)]
+
+    def buy(self, player, name, price):
+        if player.cash >= price:
+            player.cash -= price
+            player.items[name] = player.items.get(name, 0) + 1
+
+    def click(self, pos, player):
+        for btn, name, price in self.buttons:
+            if btn.hit(pos):
+                self.buy(player, name, price)
+                return True
+        return False
+
+    def draw(self, canvas, mouse, player):
+        for btn, name, price in self.buttons:
+            btn.draw(canvas, mouse)
+            canvas.blit(self.font.render(f"${price}", True, (0, 0, 0)), (btn.rect.x, btn.rect.bottom + 10))
+        canvas.blit(self.font.render(f"{player.cash}", True, (0, 0, 0)), (90, 665))
         
 
 class Browser:
@@ -42,11 +111,13 @@ class Browser:
         self.back = Button("back.png", (10, 120))
         self.join = Button("join.png", (0, 0))
         self.join.rect.center = (WIDTH // 2, HEIGHT // 2)
-        self.cards = [Button(n, (40 + i * 380, 200)) for i, n in enumerate(("card_market.png", "card_wiki.png", "card_bank.png"))]
-        self.sites = [load(n) for n in ("market.png", "wiki.png", "bank.png")]
+        self.cards = [Button(n, (40 + (i % 3) * 250, 200 + (i // 3) * 100)) for i, n in enumerate(("card_market.png", "card_wiki.png", "card_bank.png", "card_eday.png"))]
+        self.sites = [load(n) for n in ("market.png", "wiki.png", "bank.png", "eday.png")]
         self.step = self.tab.get_width() + self.TAB_GAP
         self.player = None
         self.font = pygame.font.SysFont(None, 60, True)
+        self.bank = Bank(self.font)
+        self.apps = {self.sites[2]: self.bank, self.sites[3]: Shop(self.font)}
 
         self.open = False
         self.tabs = []
@@ -78,18 +149,25 @@ class Browser:
     def click(self, pos):
         cur = self.tabs[self.current]
         card = next((s for c, s in zip(self.cards, self.sites) if c.hit(pos)), None)
+
         if self.plus.hit(pos):
             if len(self.tabs) < self.MAX_TABS:
                 self.tabs.append(self.page)
                 self.current = len(self.tabs) - 1
+
         elif self.cross.hit(pos):
             self.tabs.pop(self.current)
             self.open = bool(self.tabs)
+
             self.current = min(self.current, len(self.tabs) - 1)
         elif cur is self.page and card is not None:
             self.tabs[self.current] = card
+
         elif cur in self.sites and self.back.hit(pos):
             self.tabs[self.current] = self.page
+
+        elif cur in self.apps and self.apps[cur].click(pos, self.player):
+            pass
         else:
             self.pick_tab(pos)
 
@@ -117,9 +195,8 @@ class Browser:
             self.back.draw(canvas, mouse)
             if cur is self.sites[0]:
                 self.join.draw(canvas, mouse)
-            if cur is self.sites[2]:
-                text = self.font.render(f"{self.player.cash}", True, (0, 0, 0))
-                canvas.blit(text, (90, 665))
+            if cur in self.apps:
+                self.apps[cur].draw(canvas, mouse, self.player)
         rects = self.tab_rects()
         order = [i for i in range(len(self.tabs)) if i != self.dragging] + ([self.dragging] if self.dragging is not None else [])
         for i in order:
@@ -151,7 +228,7 @@ class Monitor:
         self.size = (int(WIDTH * self.coeff), int(HEIGHT * self.coeff))
 
     def to_desktop(self, pos):
-        return (int(pos[0] - self.pos[0]) / self.coeff, int(pos[1] - self.pos[1]) / self.coeff)
+        return (int((pos[0] - self.pos[0]) / self.coeff), int((pos[1] - self.pos[1]) / self.coeff))
 
 OUTSIDE = load("pc_bg.png")
 clock, desktop = pygame.time.Clock(), Desktop()
@@ -161,6 +238,8 @@ def run(screen, player):
     monitor, desktop.player = Monitor(screen), player
     desktop.browser.player = player
     while True:
+        player.items = getattr(player, "items", {})
+        player.debt = getattr(player, "debt", 0)
         clock.tick(60)
         for e in pygame.event.get():
             if e.type == pygame.QUIT:
