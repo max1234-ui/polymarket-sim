@@ -11,11 +11,49 @@ def load_img(img):                                  #Good idea brother
         sys.exit("missing asset" + path)
     return pygame.image.load(path).convert_alpha()
 
+def sort_news(tab): #[("text", int value)]
+    length = len(tab)
+    if length <= 1:
+        return tab
+    
+    newest = tab.pop()
+
+    for i in range(-2, -length-1, -1):
+        if newest[1] < tab[i]:
+            i = length - i + 2
+            break
+    j = 0
+    found = 0
+    new_tab = [None for i in range(length+1)]
+    while j <= length:
+        if i == j:
+            new_tab[j] = newest
+            found = 1
+        else:
+            new_tab[j] = tab[j - found]
+        j += 1
+    return new_tab
+
+
+
+
+
 class Player:
     def __init__(self):
         self.luck = 0
-        self.cash = 100
-        self.predictions = {} # "name" : percentage chance
+        self.cash = 100 # Dollares
+        self.predictions = {} # "name" : [percentage chance (float), reward]
+
+    def roll_predictions(self):
+        for key in self.predictions.keys():
+            random_number = random.uniform(0,100)
+
+            if random_number <= self.predictions[key][0]:
+                self.predictions[key][0] = True
+                cash += self.predictions[key][1]
+            
+
+
 
 class State:
     def __init__(self, resolution):
@@ -25,6 +63,8 @@ class State:
         self.resolution = resolution
         self.interactibles_per_location = {"room" : ["computer","room_door"] , "living_room": ["living_room_door", "sofa"]}
         self.masks = {"room" : {"computer" : None, "room_door" : None}, "living_room" : {"living_room_door" : None, "sofa" : None}}
+
+        self.news_text = {""}
 
 
     def draw_screen(self, screen, image_dict):
@@ -82,6 +122,19 @@ class State:
         else:
             self.state = "sofa"
 
+    def draw_news(self, screen, player, font):
+        player.roll_predictions()
+        news = []
+        for key in player.predictions.keys():
+            if player.predictions[key][0] == True:
+                if len(news) < 3:
+                    news.append(key,player.predictions[key][1])
+                elif news[3][1] < player.predictions[key][1]:
+                    news[3] = player.predictions[key]
+                    sort_news(news)
+        
+        pass
+
 
 pygame.init()
 clock = pygame.time.Clock()
@@ -123,7 +176,7 @@ images = {  "background" : {    "room" : None,
                                 "sofa" : None,
                                 "living_room_door" : None}}
 
-import pc
+#import pc
 
 player = Player()
 current_state = State(window_size)
