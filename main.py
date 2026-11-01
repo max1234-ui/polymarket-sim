@@ -132,7 +132,6 @@ class State:
                 elif news[3][1] < player.predictions[key][1]:
                     news[3] = player.predictions[key]
                     sort_news(news)
-        
         pass
 
 
