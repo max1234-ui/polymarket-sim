@@ -2,7 +2,7 @@ import os, pygame, sys
 
 WIDTH, HEIGHT = 1280, 720
 ART_W, ART_H = 1920, 1080
-SCREEN_RECT = pygame.Rect(458, 150, 935, 535)
+SCREEN_POS =(333, 116)
 BASE = os.path.dirname(os.path.abspath(__file__))
 
 def load(img):
@@ -45,6 +45,8 @@ class Browser:
         self.cards = [Button(n, (40 + i * 380, 200)) for i, n in enumerate(("card_market.png", "card_wiki.png", "card_bank.png"))]
         self.sites = [load(n) for n in ("market.png", "wiki.png", "bank.png")]
         self.step = self.tab.get_width() + self.TAB_GAP
+        self.player = None
+        self.font = pygame.font.SysFont(None, 60, True)
 
         self.open = False
         self.tabs = []
@@ -115,6 +117,9 @@ class Browser:
             self.back.draw(canvas, mouse)
             if cur is self.sites[0]:
                 self.join.draw(canvas, mouse)
+            if cur is self.sites[2]:
+                text = self.font.render(f"{self.player.cash}", True, (0, 0, 0))
+                canvas.blit(text, (90, 665))
         rects = self.tab_rects()
         order = [i for i in range(len(self.tabs)) if i != self.dragging] + ([self.dragging] if self.dragging is not None else [])
         for i in order:
@@ -139,24 +144,22 @@ class Desktop:
             self.browser.draw(canvas, mouse)
 
 class Monitor:
-    def __init__(self, window):
-        w, h = window.get_size()
-        self.frame = pygame.transform.scale(OUTSIDE, (w, h))
-        self.area = pygame.Rect(SCREEN_RECT.x * w / ART_W, SCREEN_RECT.y * h / ART_H, SCREEN_RECT.w * w / ART_W, SCREEN_RECT.h * h / ART_H)
+    def __init__(self, screen):
+        self.coeff = screen.get_width() / ART_W
+        self.frame = pygame.transform.scale(OUTSIDE, screen.get_size())
+        self.pos = (int(SCREEN_POS[0] * self.coeff), int(SCREEN_POS[1] * self.coeff))
+        self.size = (int(WIDTH * self.coeff), int(HEIGHT * self.coeff))
 
     def to_desktop(self, pos):
-        return (int((pos[0] - self.area.x) * WIDTH / self.area.w), int((pos[1] - self.area.y) * HEIGHT / self.area.h))
-
-    def draw(self, window, canvas):
-        window.fill((80, 80, 80))
-        window.blit(self.frame, (0, 0))
-        window.blit(pygame.transform.scale(canvas, self.area.size), self.area.topleft)
+        return (int(pos[0] - self.pos[0]) / self.coeff, int(pos[1] - self.pos[1]) / self.coeff)
 
 OUTSIDE = load("computer_outside.png")
-canvas, clock, desktop = pygame.Surface((WIDTH, HEIGHT)), pygame.time.Clock(), Desktop()
+clock, desktop = pygame.time.Clock(), Desktop()
 
-def run(window, player):
-    monitor, desktop.player = Monitor(window), player
+def run(screen, player):
+    pc_window = pygame.Surface((WIDTH, HEIGHT))
+    monitor, desktop.player = Monitor(screen), player
+    desktop.browser.player = player
     while True:
         clock.tick(60)
         for e in pygame.event.get():
@@ -169,6 +172,9 @@ def run(window, player):
             if hasattr(e, "pos"):
                 e.pos = monitor.to_desktop(e.pos)
             desktop.handle(e)
-        desktop.draw(canvas, monitor.to_desktop(pygame.mouse.get_pos()))
-        monitor.draw(window, canvas)
+
+        desktop.draw(pc_window, monitor.to_desktop(pygame.mouse.get_pos()))  
+        screen.fill((80, 80, 80))
+        screen.blit(monitor.frame, (0, 0))
+        screen.blit(pygame.transform.scale(pc_window, monitor.size), monitor.pos)
         pygame.display.flip()
