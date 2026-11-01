@@ -72,6 +72,32 @@ class Bank:
         self.text(canvas, f"Debt: {player.debt}", (90, 150))
         self.text(canvas, f"REPAY        Interest: {int(self.RATE * 100)}% per day", (500, 150))
 
+class Shop:
+    ITEMS = (("item_lamp.png", "lamp", 50), ("item_chair.png", "chair", 100), ("item_tv.png", "tv", 250))
+
+    def __init__(self, font):
+        self.font = font
+        self.buttons = [(Button(f, (90 + i * 380, 250)), name, price) for i,  (f, name, price)in enumerate(self.ITEMS)]
+
+    def buy(self, player, name, price):
+        if player.cash >= price:
+            player.cash -= price
+            player.items[name] = player.items.get(name, 0) + 1
+
+    def click(self, pos, player):
+        for btn, name, price in self.buttons:
+            if btn.hit(pos):
+                self.buy(player, name, price)
+                return True
+        return False
+
+    def draw(self, canvas, mouse, player):
+        for btn, name, price in self.buttons:
+            btn.draw(canvas, mouse)
+            canvas.blit(self.font.render(f"${price}", True, (0, 0, 0)), (btn.rect.x, btn.rect.bottom + 10))
+        canvas.blit(self.font.render(f"{player.cash}", True, (0, 0, 0)), (90, 665))
+        
+
 class Browser:
     TAB_X, TAB_Y, TAB_GAP, MAX_TABS = 10, 6, 2, 15
 
@@ -85,12 +111,13 @@ class Browser:
         self.back = Button("back.png", (10, 120))
         self.join = Button("join.png", (0, 0))
         self.join.rect.center = (WIDTH // 2, HEIGHT // 2)
-        self.cards = [Button(n, (40 + i * 380, 200)) for i, n in enumerate(("card_market.png", "card_wiki.png", "card_bank.png"))]
-        self.sites = [load(n) for n in ("market.png", "wiki.png", "bank.png")]
+        self.cards = [Button(n, (40 + (i % 3) * 250, 200 + (i // 3) * 100)) for i, n in enumerate(("card_market.png", "card_wiki.png", "card_bank.png", "card_eday.png"))]
+        self.sites = [load(n) for n in ("market.png", "wiki.png", "bank.png", "eday.png")]
         self.step = self.tab.get_width() + self.TAB_GAP
         self.player = None
         self.font = pygame.font.SysFont(None, 60, True)
         self.bank = Bank(self.font)
+        self.apps = {self.sites[2]: self.bank, self.sites[3]: Shop(self.font)}
 
         self.open = False
         self.tabs = []
@@ -139,7 +166,7 @@ class Browser:
         elif cur in self.sites and self.back.hit(pos):
             self.tabs[self.current] = self.page
 
-        elif cur is self.sites[2] and self.bank.click(pos, self.player):
+        elif cur in self.apps and self.apps[cur].click(pos, self.player):
             pass
         else:
             self.pick_tab(pos)
@@ -168,8 +195,8 @@ class Browser:
             self.back.draw(canvas, mouse)
             if cur is self.sites[0]:
                 self.join.draw(canvas, mouse)
-            if cur is self.sites[2]:
-                self.bank.draw(canvas, mouse, self.player)
+            if cur in self.apps:
+                self.apps[cur].draw(canvas, mouse, self.player)
         rects = self.tab_rects()
         order = [i for i in range(len(self.tabs)) if i != self.dragging] + ([self.dragging] if self.dragging is not None else [])
         for i in order:
@@ -211,6 +238,7 @@ def run(screen, player):
     monitor, desktop.player = Monitor(screen), player
     desktop.browser.player = player
     while True:
+        player.items = getattr(player, "items", {})
         player.debt = getattr(player, "debt", 0)
         clock.tick(60)
         for e in pygame.event.get():
