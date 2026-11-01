@@ -15,11 +15,7 @@ class Player:
     def __init__(self):
         self.luck = 0
         self.cash = 100
-
-class Shop:                     # Theoretical
-    def __init__(self):
-        self.upgrades = {} #Just checks if they are purchased + price
-        self.predictions = {} #Same here
+        self.predictions = {} # "name" : percentage chance
 
 class State:
     def __init__(self, resolution):
@@ -140,11 +136,13 @@ while running:
     clock.tick(60)
     mx, my = pygame.mouse.get_pos()
 
-    
-    selected_interactible = current_state.check_interact_collision((mx, my))
-    if selected_interactible != current_state.bright_sprite[0]:
-        current_state.update_bright_sprite(selected_interactible, images) 
-    
+    if current_state.state != "sofa":
+        selected_interactible = current_state.check_interact_collision((mx, my))
+        if selected_interactible != current_state.bright_sprite[0]:
+            current_state.update_bright_sprite(selected_interactible, images) 
+    else:
+        current_state.bright_sprite[0] = None
+        selected_interactible = None
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
