@@ -153,7 +153,7 @@ class Monitor:
     def to_desktop(self, pos):
         return (int(pos[0] - self.pos[0]) / self.coeff, int(pos[1] - self.pos[1]) / self.coeff)
 
-OUTSIDE = load("computer_outside.png")
+OUTSIDE = load("pc_bg.png")
 clock, desktop = pygame.time.Clock(), Desktop()
 
 def run(screen, player):
@@ -174,7 +174,7 @@ def run(screen, player):
             desktop.handle(e)
 
         desktop.draw(pc_window, monitor.to_desktop(pygame.mouse.get_pos()))  
-        screen.fill((80, 80, 80))
+        screen.fill((46, 140, 120))
         screen.blit(monitor.frame, (0, 0))
         screen.blit(pygame.transform.scale(pc_window, monitor.size), monitor.pos)
         pygame.display.flip()
