@@ -135,7 +135,7 @@ while running:
             if selected_interactible is not None:
                 current_state.room_interactible_action(selected_interactible)
     if current_state.state == "pc":
-        pc.run(window)
+        pc.run(window, player)
         current_state.state = "room"
 
 
