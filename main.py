@@ -5,6 +5,19 @@ import pygame, random, os, sys
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 
+def render_outlined_text(text:str, color:tuple, font, width:int):
+    outline_color = (255 - color[0], 255 - color[1], 255 - color[2])
+    base = font.render(text, True, color)
+    edge = font.render(text, True, outline_color)
+    surface = pygame.Surface((base.get_width() + width*2, base.get_height() + width*2), pygame.SRCALPHA)
+
+    for x in range(-width, width + 1):
+        for y in range(-width, width + 1):
+            if x * x + y * y <= width * width:
+                surface.blit(edge, (width + x, width + y))
+    surface.blit(base, (width, width))
+    return surface
+
 def load_img(img):                                  #Good idea brother
     path = os.path.join(BASE, r"assets\images", img)
     if not os.path.exists(path):
@@ -58,13 +71,19 @@ class Player:
 class State:
     def __init__(self, resolution):
         self.state = "room"         # Possible states : "room", "Living_room", "sofa", "pc"
-        self.pc_state = "main"      # Possible state : "main", "polski_tunes", "polski_market", "settings"
-        self.bright_sprite = [None, None]
+        self.pc_state = "main"      # Possible states : "main", "polski_tunes", "polski_market", "settings"
+        self.bright_sprite = [None, None, None] #name:str, brighter_sprite, position:tuple
         self.resolution = resolution
         self.interactibles_per_location = {"room" : ["computer","room_door"] , "living_room": ["living_room_door", "sofa"]}
         self.masks = {"room" : {"computer" : None, "room_door" : None}, "living_room" : {"living_room_door" : None, "sofa" : None}}
 
-        self.news_text = {""}
+        self.news_text = {  "polish_cow_dance_highway" : "For the third time this week, a neighboring cow has taken to the highway and started dancing", 
+                            "tri_poloski_together" : "For an unknown reason three visibly polish men where spotted together, singing something indescribable"}
+        
+        self.miscellaneous_news = ( "Housing market in worse shape, pricing increasing at blistering speeds", 
+                                    "Weather forecast states that there will be rain for the upcoming 24 years", 
+                                    "Local man tries cookies, dies from the taste", 
+                                    "Scientists create new cure for throat singing cats, causes dancing instead")
 
 
     def draw_screen(self, screen, image_dict):
@@ -108,9 +127,13 @@ class State:
         brite = image_dict["interactible"][self.bright_sprite[0]].copy()
         brite.fill((80, 80, 80), special_flags=pygame.BLEND_RGB_ADD)
         self.bright_sprite[1] = brite
+        self.bright_sprite[2] = {"computer" : (464, 317), "room_door" : (75, 432), "sofa" : (507, 403), "living_room_door" : (1124, 429)}[self.bright_sprite[0]]
 
-    def draw_bright_sprite(self, screen):
+
+    def draw_bright_sprite(self, screen, text_dict):
         screen.blit(self.bright_sprite[1], (0,0))
+        screen.blit(text_dict[self.bright_sprite[0]], self.bright_sprite[2])
+
 
     def room_interactible_action(self, selected):
         if selected == "room_door":
@@ -127,12 +150,14 @@ class State:
         news = []
         for key in player.predictions.keys():
             if player.predictions[key][0] == True:
-                if len(news) < 3:
+                if len(news) < 4:
                     news.append(key,player.predictions[key][1])
                 elif news[3][1] < player.predictions[key][1]:
                     news[3] = player.predictions[key]
-                    sort_news(news)
-        pass
+                sort_news(news)
+
+        
+        
 
 
 pygame.init()
@@ -156,7 +181,12 @@ window = pygame.display.set_mode(window_size)
 
 pc_window = pygame.Surface((1280*size_coefficient, 720*size_coefficient))
 
-fonts = {"interact_font" : pygame.font.SysFont(None, 30, True)}
+fonts = {"interact_font" : pygame.font.SysFont(None, 30, True), "sofa" : pygame.font.SysFont(None, 100, True)}
+all_fancy_text = {  "room_door" : render_outlined_text("Enter living room", (255, 255, 255), fonts["interact_font"], 2), 
+                    "living_room_door" : render_outlined_text("Enter room", (255, 255, 255), fonts["interact_font"], 2), 
+                    "sofa" : render_outlined_text("End day", (255, 255, 255), fonts["sofa"], 5),
+                    "computer" : render_outlined_text("Access computer", (255, 255, 255), fonts["interact_font"], 2)}
+
 original_images = { "background" : {    "room" : load_img("room_bg.png"), 
                                         "living_room" : load_img("living_room_bg.png"),
                                         "pc" : load_img("pc_bg.png")}, 
@@ -175,7 +205,7 @@ images = {  "background" : {    "room" : None,
                                 "sofa" : None,
                                 "living_room_door" : None}}
 
-#import pc
+import pc
 
 player = Player()
 current_state = State(window_size)
@@ -201,8 +231,11 @@ while running:
             running = False
         
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if selected_interactible is not None:
-                current_state.room_interactible_action(selected_interactible)
+            if event.button == 1:
+                if selected_interactible is not None:
+                    current_state.room_interactible_action(selected_interactible)
+            if event.button == 3:
+                print(mx, my)
 
     
 
@@ -222,7 +255,7 @@ while running:
     
 
     if current_state.bright_sprite[0] is not None:
-            current_state.draw_bright_sprite(window)
+            current_state.draw_bright_sprite(window, all_fancy_text)
 
     pygame.display.flip()
 
