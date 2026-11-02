@@ -72,6 +72,27 @@ class Bank:
         self.text(canvas, f"Debt: {player.debt}", (90, 150))
         self.text(canvas, f"REPAY        Interest: {int(self.RATE * 100)}% per day", (500, 150))
 
+class Storage:
+    COLS, CELL, PAD = 4, 80, 20
+
+    def __init__(self, icons, font):
+        self.box = load("box.png")
+        self.icons = {n: pygame.transform.scale(img, (self.CELL - 10,) * 2) for n, img in icons.items()}
+        self.font, self.items = font, {}
+
+    def add(self, name, n=1):
+        self.items[name] = self.items.get(name, 0) + n
+
+    def draw(self, surface, topleft):
+        surface.blit(self.box, topleft)
+        for i, (name, n) in enumerate (self.items.items()):
+            x = topleft[0] + self.PAD + (i % self.COLS) * self.CELL
+            y = topleft[1] + self.PAD + (i // self.COLS) * self.CELL
+            surface.blit(self.icons[name], (x, y))
+            if n > 1:
+                surface.blit(self.font.render(f"x{n}", True, (0, 0, 0)), (x, y + self.CELL - 30))
+        
+
 class Shop:
     ITEMS = (("item_lamp.png", "lamp", 50), ("item_chair.png", "chair", 100), ("item_tv.png", "tv", 250))
 
@@ -82,7 +103,7 @@ class Shop:
     def buy(self, player, name, price):
         if player.cash >= price:
             player.cash -= price
-            player.items[name] = player.items.get(name, 0) + 1
+            player.storage.add(name)
 
     def click(self, pos, player):
         for btn, name, price in self.buttons:
@@ -96,7 +117,9 @@ class Shop:
             btn.draw(canvas, mouse)
             canvas.blit(self.font.render(f"${price}", True, (0, 0, 0)), (btn.rect.x, btn.rect.bottom + 10))
         canvas.blit(self.font.render(f"{player.cash}", True, (0, 0, 0)), (90, 665))
-        
+        player.storage.draw(canvas, (900, 150))
+
+ICONS = {name: load(f) for f, name, _ in Shop.ITEMS}        
 
 class Browser:
     TAB_X, TAB_Y, TAB_GAP, MAX_TABS = 10, 6, 2, 15
@@ -238,7 +261,8 @@ def run(screen, player):
     monitor, desktop.player = Monitor(screen), player
     desktop.browser.player = player
     while True:
-        player.items = getattr(player, "items", {})
+        if not hasattr(player, "storage"):
+            player.storage = Storage(ICONS, desktop.browser.font)
         player.debt = getattr(player, "debt", 0)
         clock.tick(60)
         for e in pygame.event.get():
@@ -257,3 +281,4 @@ def run(screen, player):
         screen.blit(monitor.frame, (0, 0))
         screen.blit(pygame.transform.scale(pc_window, monitor.size), monitor.pos)
         pygame.display.flip()
+        
