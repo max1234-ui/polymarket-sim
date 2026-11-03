@@ -139,7 +139,7 @@ class Betting:
                     player.cash -= self.STAKE
                     player.predictions[key] = [chance, self.payout(chance)]
                 return True
-            return False
+        return False
 
     def draw(self, canvas, mouse, player):
         for btn, key, chance in self.buttons:
@@ -220,7 +220,7 @@ class Browser:
         elif cur is self.page and card is not None:
             self.tabs[self.current] = card
 
-        elif cur is self.sites[0] and self.join.hit(pos):
+        elif cur is self.sites[0] and self.join.hit(pos) and self.player.cash >= 10:
             self.tabs[self.current] = self.join_intro
             self.player.cash -= 10
             self.join_start = pygame.time.get_ticks()
