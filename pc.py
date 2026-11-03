@@ -11,6 +11,11 @@ def load(img):
         sys.exit("missing asset" + path)
     return pygame.image.load(path).convert_alpha()
 
+def check_win(player):
+    if player.cash >= 10000:
+        player.win = True
+    return getattr(player, "win", False)
+
 
 #######asset loading########
 class Button:
@@ -48,8 +53,10 @@ class Bank:
         player.cash -= amount
         player.debt -= amount
 
-    def end_day(self, player):
-        player.debt = round(player.debt * (1 + self.RATE))
+    def end_day(player):
+        player.debt = round(getattr(player, "debt", 0) * (1 + Bank.RATE))
+        check_win(player)
+        return won
 
     def click(self, pos, player):
         for btn, amount in self.loan_btns:
@@ -95,6 +102,8 @@ class Storage:
 
 class Shop:
     ITEMS = (("item_lamp.png", "lamp", 50), ("item_chair.png", "chair", 100), ("item_tv.png", "tv", 250))
+    LUCK = {"lamp": 1, "chair": 2, "tv": 4}
+    ITEM_LIMIT = {"lamp": 3, "chair": 5, "tv: 25"}
 
     def __init__(self, font):
         self.font = font
@@ -313,6 +322,7 @@ def run(screen, player):
             player.storage = Storage(ICONS, desktop.browser.font)
         player.debt = getattr(player, "debt", 0)
         clock.tick(60)
+        check_win(player)
         for e in pygame.event.get():
             if e.type == pygame.QUIT:
                 pygame.quit()
@@ -328,5 +338,8 @@ def run(screen, player):
         screen.fill((46, 140, 120))
         screen.blit(monitor.frame, (0, 0))
         screen.blit(pygame.transform.scale(pc_window, monitor.size), monitor.pos)
+        if getattr(player, "win", False):
+            msg = desktop.browser.font.render("YOU WIN!!!!", True, (255, 255, 0))
+            screen.blit(msg, msg.get_rect(center=screen.get_rect().center))
         pygame.display.flip()
         
