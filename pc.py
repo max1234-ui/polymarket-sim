@@ -82,10 +82,11 @@ class Bank:
 class Storage:
     COLS, CELL, PAD = 4, 80, 20
 
-    def __init__(self, icons, font):
+    def __init__(self, icons, font, limits):
         self.box = load("box.png")
         self.icons = {n: pygame.transform.scale(img, (self.CELL - 10,) * 2) for n, img in icons.items()}
-        self.font, self.items = font, {}
+        self.font, self.items, self.limits = font, {}, limits
+        self.small = pygame.font.SysFont(None, 30, True)
 
     def add(self, name, n=1):
         self.items[name] = self.items.get(name, 0) + n
@@ -96,21 +97,21 @@ class Storage:
             x = topleft[0] + self.PAD + (i % self.COLS) * self.CELL
             y = topleft[1] + self.PAD + (i // self.COLS) * self.CELL
             surface.blit(self.icons[name], (x, y))
-            if n > 1:
-                surface.blit(self.font.render(f"x{n}", True, (0, 0, 0)), (x, y + self.CELL - 30))
+            surface.blit(self.small.render(f"x{n}/{self.limits[name]}", True, (0, 0, 0)), (x, y + self.CELL - 30))
         
 
 class Shop:
     ITEMS = (("item_lamp.png", "lamp", 50), ("item_chair.png", "chair", 100), ("item_tv.png", "tv", 250))
     LUCK = {"lamp": 1, "chair": 2, "tv": 4}
-    ITEM_LIMIT = {"lamp": 3, "chair": 5, "tv: 25"}
+    ITEM_LIMIT = {"lamp": 3, "chair": 5, "tv": 25}
 
     def __init__(self, font):
         self.font = font
         self.buttons = [(Button(f, (90 + i * 380, 250)), name, price) for i,  (f, name, price)in enumerate(self.ITEMS)]
 
     def buy(self, player, name, price):
-        if player.cash >= price:
+        owned = player.storage.items.get(name, 0)
+        if player.cash >= price and owned < self.ITEM_LIMIT[name]:
             player.cash -= price
             player.storage.add(name)
 
@@ -124,7 +125,9 @@ class Shop:
     def draw(self, canvas, mouse, player):
         for btn, name, price in self.buttons:
             btn.draw(canvas, mouse)
-            canvas.blit(self.font.render(f"${price}", True, (0, 0, 0)), (btn.rect.x, btn.rect.bottom + 10))
+            owned = player.storage.items.get(name, 0)
+            label = f"${price}"
+            canvas.blit(self.font.render(label, True, (0, 0, 0)), (btn.rect.x, btn.rect.bottom + 10))
         canvas.blit(self.font.render(f"{player.cash}", True, (0, 0, 0)), (90, 665))
         player.storage.draw(canvas, (900, 150))
 
@@ -319,7 +322,7 @@ def run(screen, player):
     desktop.browser.player = player
     while True:
         if not hasattr(player, "storage"):
-            player.storage = Storage(ICONS, desktop.browser.font)
+            player.storage = Storage(ICONS, desktop.browser.font, Shop.ITEM_LIMIT)
         player.debt = getattr(player, "debt", 0)
         clock.tick(60)
         check_win(player)
