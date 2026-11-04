@@ -64,7 +64,7 @@ class Bank:
             return
         player.cash -= due
         player.debt -= due
-        player.debt = round(player.debt * (1 + Bank.))
+        player.debt = round(player.debt * (1 + Bank.RATE))
         check_win(player)
 
     
