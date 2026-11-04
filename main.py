@@ -3,7 +3,11 @@
 
 import pygame, random, os, sys
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+def get_base_dir():
+    if getattr(sys, "frozen, false"):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.abspath(__file__)) 
+base = get_base_dir()
 
 def render_outlined_text(text:str, color:tuple, font, width:int):
     outline_color = (255 - color[0], 255 - color[1], 255 - color[2])
