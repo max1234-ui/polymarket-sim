@@ -10,7 +10,7 @@ HOW TO play:
 
 (use your mouse to interact with menus and doors)
 
-when you acces the computer : you can roam around the desktop and so far only 1 app is available , Internet explorer , where you can acces the INTERNET ik right where you have app suggestions such as : eday, wiki, polski market, and mybank.polski and eday.
+when you acces the computer : you can roam around the desktop and so far only 1 app is available , Internet explorer , where you can acces the INTERNET ik right where you have app suggestions such as : eday, wiki, polski market, and mybank.polski.
 these sites are accesible through any of the many tabs you can make.<img width="1312" height="780" alt="image" src="https://github.com/user-attachments/assets/1591ea6d-e601-41c2-ad23-e978461ca8b7" />
 
 When you access the living room : you will be brought to well the living room where you can end the day by pressing on the couch. You can come back to main room by pressing on right door. 
