@@ -11,6 +11,11 @@ def load(img):
         sys.exit("missing asset" + path)
     return pygame.image.load(path).convert_alpha()
 
+def check_win(player):
+    if player.cash >= 10000:
+        player.win = True
+    return getattr(player, "win", False)
+
 
 #######asset loading########
 class Button:
@@ -48,8 +53,10 @@ class Bank:
         player.cash -= amount
         player.debt -= amount
 
-    def end_day(self, player):
-        player.debt = round(player.debt * (1 + self.RATE))
+    def end_day(player):
+        player.debt = round(getattr(player, "debt", 0) * (1 + Bank.RATE))
+        check_win(player)
+        return won
 
     def click(self, pos, player):
         for btn, amount in self.loan_btns:
@@ -75,10 +82,11 @@ class Bank:
 class Storage:
     COLS, CELL, PAD = 4, 80, 20
 
-    def __init__(self, icons, font):
+    def __init__(self, icons, font, limits):
         self.box = load("box.png")
         self.icons = {n: pygame.transform.scale(img, (self.CELL - 10,) * 2) for n, img in icons.items()}
-        self.font, self.items = font, {}
+        self.font, self.items, self.limits = font, {}, limits
+        self.small = pygame.font.SysFont(None, 30, True)
 
     def add(self, name, n=1):
         self.items[name] = self.items.get(name, 0) + n
@@ -89,19 +97,21 @@ class Storage:
             x = topleft[0] + self.PAD + (i % self.COLS) * self.CELL
             y = topleft[1] + self.PAD + (i // self.COLS) * self.CELL
             surface.blit(self.icons[name], (x, y))
-            if n > 1:
-                surface.blit(self.font.render(f"x{n}", True, (0, 0, 0)), (x, y + self.CELL - 30))
+            surface.blit(self.small.render(f"x{n}/{self.limits[name]}", True, (0, 0, 0)), (x, y + self.CELL - 30))
         
 
 class Shop:
     ITEMS = (("item_lamp.png", "lamp", 50), ("item_chair.png", "chair", 100), ("item_tv.png", "tv", 250))
+    LUCK = {"lamp": 1, "chair": 2, "tv": 4}
+    ITEM_LIMIT = {"lamp": 3, "chair": 5, "tv": 25}
 
     def __init__(self, font):
         self.font = font
         self.buttons = [(Button(f, (90 + i * 380, 250)), name, price) for i,  (f, name, price)in enumerate(self.ITEMS)]
 
     def buy(self, player, name, price):
-        if player.cash >= price:
+        owned = player.storage.items.get(name, 0)
+        if player.cash >= price and owned < self.ITEM_LIMIT[name]:
             player.cash -= price
             player.storage.add(name)
 
@@ -115,11 +125,42 @@ class Shop:
     def draw(self, canvas, mouse, player):
         for btn, name, price in self.buttons:
             btn.draw(canvas, mouse)
-            canvas.blit(self.font.render(f"${price}", True, (0, 0, 0)), (btn.rect.x, btn.rect.bottom + 10))
+            owned = player.storage.items.get(name, 0)
+            label = f"${price}"
+            canvas.blit(self.font.render(label, True, (0, 0, 0)), (btn.rect.x, btn.rect.bottom + 10))
         canvas.blit(self.font.render(f"{player.cash}", True, (0, 0, 0)), (90, 665))
         player.storage.draw(canvas, (900, 150))
 
 ICONS = {name: load(f) for f, name, _ in Shop.ITEMS}        
+
+class Betting:
+    BETS = (("bet_cow.png", "polish_cow_dance_highway", 20), ("bet_poloski.png", "tri_poloski_together", 35))
+    STAKE = 20
+
+    def __init__(self, font):
+        self.font = font
+        self.buttons = [(Button(f, (90, 220 + i * 100)), key, chance) for i, (f, key, chance) in enumerate(self.BETS)]
+
+    def payout(self, chance):
+        return round (self.STAKE * 100 / chance)
+
+    def click(self, pos, player):
+        for btn, key, chance in self.buttons:
+            if btn.hit(pos):
+                if key not in player.predictions and player.cash >= self.STAKE:
+                    player.cash -= self.STAKE
+                    player.predictions[key] = [chance, self.payout(chance)]
+                return True
+        return False
+
+    def draw(self, canvas, mouse, player):
+        for btn, key, chance in self.buttons:
+            btn.draw(canvas, mouse)
+            label = "BET PLACED" if key in player.predictions else f"{chance}% -> ${self.payout(chance)}"
+            canvas.blit(self.font.render(label, True, (0, 0, 0)), (btn.rect.right + 20, btn.rect.y + 10))
+        canvas.blit(self.font.render(f"{player.cash}", True, (0, 0, 0)), (90, 665))
+        
+        
 
 class Browser:
     TAB_X, TAB_Y, TAB_GAP, MAX_TABS = 10, 6, 2, 15
@@ -135,12 +176,17 @@ class Browser:
         self.join = Button("join.png", (0, 0))
         self.join.rect.center = (WIDTH // 2, HEIGHT // 2)
         self.cards = [Button(n, (40 + (i % 3) * 250, 200 + (i // 3) * 100)) for i, n in enumerate(("card_market.png", "card_wiki.png", "card_bank.png", "card_eday.png"))]
-        self.sites = [load(n) for n in ("market.png", "wiki.png", "bank.png", "eday.png")]
+        self.sites = [load(n) for n in ("market.png", "wiki.png", "bank.png", "eday.png", "market_join.png", "market_join1s.png")]
         self.step = self.tab.get_width() + self.TAB_GAP
         self.player = None
         self.font = pygame.font.SysFont(None, 60, True)
         self.bank = Bank(self.font)
         self.apps = {self.sites[2]: self.bank, self.sites[3]: Shop(self.font)}
+        self.join_page = self.sites[4]
+        self.join_intro = self.sites[5]
+        self.join_start = 0
+        self.apps[self.join_page] = Betting(self.font)
+
 
         self.open = False
         self.tabs = []
@@ -186,13 +232,26 @@ class Browser:
         elif cur is self.page and card is not None:
             self.tabs[self.current] = card
 
+        elif cur is self.sites[0] and self.join.hit(pos) and self.player.cash >= 10:
+            self.tabs[self.current] = self.join_intro
+            self.player.cash -= 10
+            self.join_start = pygame.time.get_ticks()
+
         elif cur in self.sites and self.back.hit(pos):
-            self.tabs[self.current] = self.page
+            self.tabs[self.current] = self.sites[0] if cur is self.join_page else self.page
+
+        elif cur in self.sites and self.back.hit(pos):
+            self.tabs[self.current] = self.sites[0] if cur in (self.join_intro, self.join_page) else self.page
 
         elif cur in self.apps and self.apps[cur].click(pos, self.player):
             pass
         else:
             self.pick_tab(pos)
+    def update(self):
+        if pygame.time.get_ticks() - self.join_start >= 1000:
+            for i, t in enumerate(self.tabs):
+                if t is self.join_intro:
+                    self.tabs[i] = self.join_page 
 
     def pick_tab(self, pos):
         for i, r in enumerate(self.tab_rects()):
@@ -209,6 +268,7 @@ class Browser:
             self.dragging = self.current = target
 
     def draw(self, canvas, mouse):
+        self.update()
         cur = self.tabs[self.current]
         canvas.blit(cur, (0, 0))
         if cur is self.page:
@@ -262,9 +322,10 @@ def run(screen, player):
     desktop.browser.player = player
     while True:
         if not hasattr(player, "storage"):
-            player.storage = Storage(ICONS, desktop.browser.font)
+            player.storage = Storage(ICONS, desktop.browser.font, Shop.ITEM_LIMIT)
         player.debt = getattr(player, "debt", 0)
         clock.tick(60)
+        check_win(player)
         for e in pygame.event.get():
             if e.type == pygame.QUIT:
                 pygame.quit()
@@ -280,5 +341,8 @@ def run(screen, player):
         screen.fill((46, 140, 120))
         screen.blit(monitor.frame, (0, 0))
         screen.blit(pygame.transform.scale(pc_window, monitor.size), monitor.pos)
+        if getattr(player, "win", False):
+            msg = desktop.browser.font.render("YOU WIN!!!!", True, (255, 255, 0))
+            screen.blit(msg, msg.get_rect(center=screen.get_rect().center))
         pygame.display.flip()
         
