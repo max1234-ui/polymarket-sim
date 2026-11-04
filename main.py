@@ -4,7 +4,7 @@
 import pygame, random, os, sys
 
 def get_base_dir():
-    if getattr(sys, "frozen", false):
+    if getattr(sys, "frozen", False):
         return sys._MEIPASS
     return os.path.dirname(os.path.abspath(__file__)) 
 BASE = get_base_dir()

@@ -4,7 +4,7 @@ WIDTH, HEIGHT = 1280, 720
 ART_W, ART_H = 1920, 1080
 SCREEN_POS =(333, 116)
 def get_base_dir():
-    if getattr(sys, "frozen", false):
+    if getattr(sys, "frozen", False):
         return sys._MEIPASS
     return os.path.dirname(os.path.abspath(__file__)) 
 BASE = get_base_dir()
