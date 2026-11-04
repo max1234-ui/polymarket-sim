@@ -4,10 +4,10 @@ WIDTH, HEIGHT = 1280, 720
 ART_W, ART_H = 1920, 1080
 SCREEN_POS =(333, 116)
 def get_base_dir():
-    if getattr(sys, "frozen, false"):
+    if getattr(sys, "frozen", false):
         return sys._MEIPASS
     return os.path.dirname(os.path.abspath(__file__)) 
-base = get_base_dir()
+BASE = get_base_dir()
 def load(img):
     path = os.path.join(BASE, "assets", "pc",img)
     if not os.path.exists(path):
