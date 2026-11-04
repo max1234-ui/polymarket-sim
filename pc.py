@@ -15,7 +15,7 @@ def load(img):
     return pygame.image.load(path).convert_alpha()
 
 def check_win(player):
-    if player.cash >= 10000:
+    if player.cash >= 10000 and not getattr(player, "lose", False):
         player.win = True
     return getattr(player, "win", False)
  
@@ -56,11 +56,18 @@ class Bank:
         player.cash -= amount
         player.debt -= amount
 
+    @staticmethod
     def end_day(player):
-        player.debt = round(getattr(player, "debt", 0) * (1 + Bank.RATE))
+        due = (player.debt + 9) // 10
+        if player.cash < due:
+            player.lose = True
+            return
+        player.cash -= due
+        player.debt -= due
+        player.debt = round(player.debt * (1 + Bank.))
         check_win(player)
-        return won
 
+    
     def click(self, pos, player):
         for btn, amount in self.loan_btns:
             if btn.hit(pos):
@@ -80,7 +87,7 @@ class Bank:
             btn.draw(canvas, mouse)
         self.text(canvas, f"{player.cash}",(90, 665))
         self.text(canvas, f"Debt: {player.debt}", (90, 150))
-        self.text(canvas, f"REPAY        Interest: {int(self.RATE * 100)}% per day", (500, 150))
+        self.text(canvas, f"Due daily: {(player.debt + 9) // 10}", (90, 100))
 
 class Storage:
     COLS, CELL, PAD = 4, 80, 20
@@ -102,10 +109,9 @@ class Storage:
             surface.blit(self.icons[name], (x, y))
             surface.blit(self.small.render(f"x{n}/{self.limits[name]}", True, (0, 0, 0)), (x, y + self.CELL - 30))
         
-
 class Shop:
     ITEMS = (("item_lamp.png", "lamp", 50), ("item_chair.png", "chair", 100), ("item_tv.png", "tv", 250))
-    LUCK = {"lamp": 1, "chair": 2, "tv": 4}
+    LUCK = {"lamp": 1, "chair": 1, "tv": 2}
     ITEM_LIMIT = {"lamp": 3, "chair": 5, "tv": 25}
 
     def __init__(self, font):
@@ -137,7 +143,7 @@ class Shop:
 ICONS = {name: load(f) for f, name, _ in Shop.ITEMS}        
 
 class Betting:
-    BETS = (("bet_cow.png", "polish_cow_dance_highway", 20), ("bet_poloski.png", "tri_poloski_together", 35))
+    BETS = (("bet_cow.png", "polish_cow_dance_highway", 20), ("bet_poloski.png", "tri_poloski_together", 35,), ("bet_yaga.png", "baba_yaga_hut_parked", 8), ("bet_babushka.png", "babushka_million_discount", 3) )
     MAX_DIGITS = 6
 
     def __init__(self, font):
@@ -373,6 +379,9 @@ def run(screen, player):
         screen.blit(pygame.transform.scale(pc_window, monitor.size), monitor.pos)
         if getattr(player, "win", False):
             msg = desktop.browser.font.render("YOU WIN!!!!", True, (255, 255, 0))
+            screen.blit(msg, msg.get_rect(center=screen.get_rect().center))
+        if getattr(player, "lose", False):
+            msg = desktop.browser.font.render("You lose - Debt unpaid", True, (255, 0, 0))
             screen.blit(msg, msg.get_rect(center=screen.get_rect().center))
         pygame.display.flip()
         
