@@ -18,7 +18,7 @@ def check_win(player):
     if player.cash >= 10000:
         player.win = True
     return getattr(player, "win", False)
-
+ 
 
 #######asset loading########
 class Button:
@@ -138,32 +138,55 @@ ICONS = {name: load(f) for f, name, _ in Shop.ITEMS}
 
 class Betting:
     BETS = (("bet_cow.png", "polish_cow_dance_highway", 20), ("bet_poloski.png", "tri_poloski_together", 35))
-    STAKE = 20
+    MAX_DIGITS = 6
 
     def __init__(self, font):
         self.font = font
         self.buttons = [(Button(f, (90, 220 + i * 100)), key, chance) for i, (f, key, chance) in enumerate(self.BETS)]
+        self.text = "20"
+        self.editing = False
+        self.stake_rect = pygame.Rect(90, 150, 0, 0)
+
+    @property
+    def stake(self):
+        return int(self.text) if self.text else 0
+
+    def key(self, e):
+        if not self.editing:
+                return
+        if e.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            self.editing = False
+        elif e.key == pygame.K_BACKSPACE:
+            self.text = self.text[:-1]
+        elif e.unicode and e.unicode in "0123456789" and len(self.text) < self.MAX_DIGITS:
+            self.text += e.unicode
 
     def payout(self, chance):
-        return round (self.STAKE * 100 / chance)
+        return round (self.stake * 100 / chance)
 
     def click(self, pos, player):
+        if self.stake_rect.collidepoint(pos):
+            self.editing = True
+            return True
+        self.editing = False
         for btn, key, chance in self.buttons:
             if btn.hit(pos):
-                if key not in player.predictions and player.cash >= self.STAKE:
-                    player.cash -= self.STAKE
+                if key not in player.predictions and 0 < self.stake <= player.cash:
+                    player.cash -= self.stake
                     player.predictions[key] = [chance, self.payout(chance)]
                 return True
         return False
 
     def draw(self, canvas, mouse, player):
+        stake_surf = self.font.render(f"Stake: ${self.text}{'|' if self.editing else ''}", True, (0, 0, 0))
+        self.stake_rect = stake_surf.get_rect(topleft=(90, 150))
+        canvas.blit(stake_surf, self.stake_rect)
+        
         for btn, key, chance in self.buttons:
             btn.draw(canvas, mouse)
             label = "BET PLACED" if key in player.predictions else f"{chance}% -> ${self.payout(chance)}"
             canvas.blit(self.font.render(label, True, (0, 0, 0)), (btn.rect.right + 20, btn.rect.y + 10))
         canvas.blit(self.font.render(f"{player.cash}", True, (0, 0, 0)), (90, 665))
-        
-        
 
 class Browser:
     TAB_X, TAB_Y, TAB_GAP, MAX_TABS = 10, 6, 2, 15
@@ -217,6 +240,10 @@ class Browser:
             self.drag(e.pos[0])
         elif e.type == pygame.MOUSEBUTTONUP and e.button == 1:
             self.dragging = None
+        elif e.type == pygame.KEYDOWN:
+            app = self.apps.get(self.tabs[self.current])
+            if app is not None and hasattr(app, "key"):
+                app.key(e)
 
     def click(self, pos):
         cur = self.tabs[self.current]
