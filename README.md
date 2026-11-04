@@ -1,7 +1,12 @@
 This game is a simulator of a polish person who has an addiction to real life betting.
 When game starts you appear inside of the room where you can acces the computer or leave to the living room.
 
-TO play:
+HOW TO RUN:
+download zip file from itchpage https://max1234-ui.itch.io/poslki-market
+then extract it in your file explorer
+then run the .exe file inside and enjoy
+
+HOW TO play:
 
 (use your mouse to interact with menus and doors)
 
