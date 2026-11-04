@@ -19,7 +19,7 @@ def render_outlined_text(text:str, color:tuple, font, width:int):
     return surface
 
 def load_img(img):                                  #Good idea brother
-    path = os.path.join(BASE, r"assets\images", img)
+    path = os.path.join(BASE, "assets", "images",img)
     if not os.path.exists(path):
         sys.exit("missing asset" + path)
     return pygame.image.load(path).convert_alpha()
