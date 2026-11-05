@@ -326,6 +326,7 @@ class Calculator:
     POS = (47, 4)
     GRID, CELL, COLS = (20, 140), (90, 70), 4
     CLOSE = pygame.Rect(360, 0, 40, 30)
+    TITLE = pygame.Rect(0, 0, 360, 30)
     MAX = 14
     KEYS = ("C", "<", "/", "*", "7", "8", "9", "-", "4", "5", "6", "+", "1", "2", "3", "=", "0", ".", "", "")
 
@@ -335,6 +336,8 @@ class Calculator:
         self.font = pygame.font.SysFont(None, 50, True)
         self.open = self.focus = self.after = False
         self.text = ""
+        self.dragging = False
+        self.grab = (0, 0)
     
     def contains(self, pos):
         return self.open and self.rect.collidepoint(pos)
@@ -382,10 +385,18 @@ class Calculator:
         if self.CLOSE.collidepoint(x, y):
             self.open = False
             return
+        if self.TITLE.collidepoint(x, y):
+            self.dragging =  True
+            self.grab = (x, y)
+            return
         col = (x - self.GRID[0]) // self.CELL[0]
         row = (y - self.GRID[1]) // self.CELL[1]
         if 0 <= col < self.COLS and 0 <= row < len(self.KEYS) // self.COLS:
             self.press(self.KEYS[row * self.COLS + col])
+
+    def drag(self, pos):
+        self.rect.x = max(0, min(pos[0] - self.grab[0], WIDTH - self.rect.w))
+        self.rect.y = max(0, min(pos[1] - self.grab[1], HEIGHT - self.rect.h))
 
     def key(self, e):
         if e.key == pygame.K_BACKSPACE:
@@ -415,6 +426,13 @@ class Desktop:
         self.browser, self.player = Browser(), None
 
     def handle(self, e):
+        if e.type == pygame.MOUSEMOTION and self.calc.dragging:
+            self.calc.drag(e.pos)
+            return
+        if e.type == pygame.MOUSEBUTTONUP and e.button == 1 and self.calc.dragging:
+            self.calc.dragging = False
+            return
+        
         if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
             self.calc.focus = self.calc.contains(e.pos)
             if self.calc.focus:
