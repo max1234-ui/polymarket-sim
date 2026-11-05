@@ -1,4 +1,4 @@
-import os, pygame, sys
+import os, pygame, sys, re
 
 WIDTH, HEIGHT = 1280, 720
 ART_W, ART_H = 1920, 1080
@@ -66,7 +66,6 @@ class Bank:
         player.debt -= due
         player.debt = round(player.debt * (1 + Bank.RATE))
         check_win(player)
-
     
     def click(self, pos, player):
         for btn, amount in self.loan_btns:
@@ -323,21 +322,125 @@ class Browser:
         self.plus.draw(canvas, mouse)
         self.cross.draw(canvas, mouse)
 
+class Calculator:
+    POS = (47, 4)
+    GRID, CELL, COLS = (20, 140), (90, 70), 4
+    CLOSE = pygame.Rect(360, 0, 40, 30)
+    MAX = 14
+    KEYS = ("C", "<", "/", "*", "7", "8", "9", "-", "4", "5", "6", "+", "1", "2", "3", "=", "0", ".", "", "")
+
+    def __init__(self):
+        self.img = load("calc.png")
+        self.rect = self.img.get_rect(topleft=self.POS)
+        self.font = pygame.font.SysFont(None, 50, True)
+        self.open = self.focus = self.after = False
+        self.text = ""
+    
+    def contains(self, pos):
+        return self.open and self.rect.collidepoint(pos)
+
+    def evaluate(self):
+        if not self.text:
+            return
+        try:
+            expr = re.sub(r"(?<![\d.])0+(?=\d)", "", self.text)
+            value = eval(expr)
+            self.text = str(int(value)) if value == int(value) else str(round(value, 6))
+        except Exception:
+            self.text = "Error"
+        self.after = True
+
+    def press(self, k):
+        if not k:
+            return
+        if self.text == "Error":
+            self.text = ""
+        if k == "C":
+            self.text = ""
+        elif k == "<":
+            self.text = self.text[:-1]
+        elif k == "=":
+            self.evaluate()
+        elif k in "+-*/":
+            self.after = False
+            if not self.text:
+                if k == "-":
+                    self.text = "-"
+            elif self.text == "-":
+                pass
+            elif self.text[-1] in "+-*/":
+                self.text = self.text[:-1] + k
+            else:
+                self.text += k
+        else:
+            if self.after:
+                self.text, self.after = "", False
+            if len (self.text) < self.MAX:
+                self.text += k
+    def click(self, pos):
+        x, y = pos[0] - self.rect.x, pos[1] - self.rect.y
+        if self.CLOSE.collidepoint(x, y):
+            self.open = False
+            return
+        col = (x - self.GRID[0]) // self.CELL[0]
+        row = (y - self.GRID[1]) // self.CELL[1]
+        if 0 <= col < self.COLS and 0 <= row < len(self.KEYS) // self.COLS:
+            self.press(self.KEYS[row * self.COLS + col])
+
+    def key(self, e):
+        if e.key == pygame.K_BACKSPACE:
+            self.press("<")
+        elif e.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            self.press("=")
+        elif e.unicode and e.unicode in "0123456789.+-*/":
+            self.press(e.unicode)
+
+    def draw(self, canvas):
+        if not self.open:
+            return
+        canvas.blit(self.img, self.rect)
+        shown = self.font.render(self.text or "0", True, (0, 0, 0))
+        canvas.blit(shown, shown.get_rect(topright=(self.rect.right - 30, self.rect.y + 50)))
+        for i, k in enumerate(self.KEYS):
+            if k:
+                cell = pygame.Rect(self.rect.x + self.GRID[0] + (i % self.COLS) * self.CELL[0], self.rect.y + self.GRID[1] + (i // self.COLS) * self.CELL[1], *self.CELL)
+                label = self.font.render(k, True, (0, 0, 0))
+                canvas.blit(label, label.get_rect(center=cell.center))
+                
 class Desktop:
     def __init__(self):
         self.background, self.ie = load("bg.png"), Button("ie.png", (30, 30))
+        self.calc_icon = Button("calc_icon.png", (30, 150))
+        self.calc = Calculator()
         self.browser, self.player = Browser(), None
 
     def handle(self, e):
+        if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+            self.calc.focus = self.calc.contains(e.pos)
+            if self.calc.focus:
+                self.calc.click(e.pos)
+                self.calc.focus = self.calc.open
+                return
+        elif e.type == pygame.KEYDOWN and self.calc.focus:
+            self.calc.key(e)
+            return
         if self.browser.open:
             self.browser.handle(e)
-        elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 and self.ie.hit(e.pos):
-            self.browser.open_browser()
+        elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+            if self.ie.hit(e.pos):
+                self.browser.open_browser()
+            elif self.calc_icon.hit(e.pos):
+                self.calc.open = True
+            
+
+
     def draw(self, canvas, mouse):
         canvas.blit(self.background, (0, 0))
         self.ie.draw(canvas, mouse)
+        self.calc_icon.draw(canvas, mouse)
         if self.browser.open:
             self.browser.draw(canvas, mouse)
+        self.calc.draw(canvas)
 
 class Monitor:
     def __init__(self, screen):
