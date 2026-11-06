@@ -145,8 +145,9 @@ class State:
             self.state = "room"
         elif selected == "computer":
             self.state = "pc"
-        else:
+        elif selected == "sofa":
             self.state = "sofa"
+            pygame.quit(), sys.exit()
 
     def draw_news(self, screen, player, font):
         player.roll_predictions()
