@@ -54,7 +54,6 @@ def sort_news(tab): #[("text", int value)]
 
 
 
-
 class Player:
     def __init__(self):
         self.luck = 0

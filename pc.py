@@ -417,23 +417,95 @@ class Calculator:
                 cell = pygame.Rect(self.rect.x + self.GRID[0] + (i % self.COLS) * self.CELL[0], self.rect.y + self.GRID[1] + (i // self.COLS) * self.CELL[1], *self.CELL)
                 label = self.font.render(k, True, (0, 0, 0))
                 canvas.blit(label, label.get_rect(center=cell.center))
-                
+
+class Library:
+    POS = (120, 60)
+    TITLE = pygame.Rect(0, 0, 360, 30)
+    CLOSE = pygame.Rect(360, 0, 40, 30)
+    LIST, ROW = (20, 50), (340, 50)
+    PLAY = pygame.Rect(360, 60, 160, 50)
+    GAMES =(("snek.png", "snek", 3, 40),)
+
+    def __init__(self):
+        self.img = load("library.png")
+        self.play_img = load("play.png")
+        self.rect = self.img.get_rect(topleft=self.POS)
+        self.font = pygame.font.SysFont(None, 30, True)
+        self.icons = {g[1]: pygame.transform.scale(load(g[0]), (40, 40)) for g in self.GAMES}
+        self.info = {g[1]: g for g in self.GAMES}
+        self.open = self.dragging = False
+        self.grab = (0, 0)
+        self.selected = None
+
+    def contains(self, pos):
+        return self.open and self.rect.collidepoint(pos)
+
+    def owned(self, player):
+        return [g for g in self.GAMES if g[1] in player.games]
+
+    def drag(self, pos):
+        self.rect.x = max(0, min(pos[0] - self.grab[0], WIDTH - self.rect.w))
+        self.rect.y = max(0, min(pos[1] - self.grab[1], HEIGHT - self.rect.h))
+
+    def click(self, pos, player):
+        x, y = pos[0] - self.rect.x, pos[1] - self.rect.y
+        if self.CLOSE.collidepoint(x, y):
+            self.open = False
+            return
+        if self.TITLE.collidepoint(x, y):
+            self.dragging, self.grab = True, (x, y)
+            return
+        owned = self.owned(player)
+        row = (y - self.LIST[1]) // self.ROW[1]
+        if  self.LIST[0] <= x < self.LIST[0] + self.ROW[0] and 0 <= row <len(owned):
+            self.selected = owned[row][1]
+        elif self.PLAY.collidepoint(x, y) and self.selected:
+            player.played.add(self.selected)
+
+    def draw(self, canvas, player):
+        if not self.open:
+            return
+        canvas.blit(self.img, self.rect)
+        for i, (_, name, _, _) in enumerate(self.owned(player)):
+            x = self.rect.x + self.LIST[0]
+            y = self.rect.y + self.LIST[1] + i * self.ROW[1]
+            canvas.blit(self.icons[name], (x, y))
+            color = (255, 0, 0) if name == self.selected else (0, 0, 0)
+            canvas.blit(self.font.render(name, True, color), (x+ 50, y + 10))
+        if self.selected:
+            luck = self.info[self.selected][2]
+            done = self.selected in player.played
+            text ="played today" if done else f"Play: +{luck}% luck today"
+            canvas.blit(self.font.render(text, True, (0, 0, 0)) , (self.rect.x + 180, self.rect.y + 40))
+            canvas.blit(self.play_img, (self.rect.x + self.PLAY.x, self.rect.y + self.PLAY.y))
+
 class Desktop:
     def __init__(self):
         self.background, self.ie = load("bg.png"), Button("ie.png", (30, 30))
         self.calc_icon = Button("calc_icon.png", (30, 150))
         self.calc = Calculator()
+        self.library_icon = Button("Library_icon.png", (30, 270))
+        self.library = Library()
         self.browser, self.player = Browser(), None
 
     def handle(self, e):
-        if e.type == pygame.MOUSEMOTION and self.calc.dragging:
-            self.calc.drag(e.pos)
-            return
+        for win in (self.calc, self.library):
+            if win.dragging:
+                if e.type == pygame.MOUSEMOTION:
+                    win.drag(e.pos)
+                elif e.type == pygame.MOUSEBUTTONUP and e.button == 1:
+                    win.dragging = False
+                return
+
         if e.type == pygame.MOUSEBUTTONUP and e.button == 1 and self.calc.dragging:
             self.calc.dragging = False
             return
         
         if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+            if self.library.contains(e.pos):
+                self.calc.focus = False
+                self.library.click(e.pos, self.player)
+                return
             self.calc.focus = self.calc.contains(e.pos)
             if self.calc.focus:
                 self.calc.click(e.pos)
@@ -449,16 +521,19 @@ class Desktop:
                 self.browser.open_browser()
             elif self.calc_icon.hit(e.pos):
                 self.calc.open = True
+            elif self.library_icon.hit(e.pos):
+                self.library.open = True
             
-
 
     def draw(self, canvas, mouse):
         canvas.blit(self.background, (0, 0))
         self.ie.draw(canvas, mouse)
         self.calc_icon.draw(canvas, mouse)
+        self.library_icon.draw(canvas, mouse)
         if self.browser.open:
             self.browser.draw(canvas, mouse)
         self.calc.draw(canvas)
+        self.library.draw(canvas, self.player)
 
 class Monitor:
     def __init__(self, screen):
@@ -480,6 +555,8 @@ def run(screen, player):
     while True:
         if not hasattr(player, "storage"):
             player.storage = Storage(ICONS, desktop.browser.font, Shop.ITEM_LIMIT)
+        player.games = getattr(player, "games", ["snek"])
+        player.played = getattr(player, "played", set())
         player.debt = getattr(player, "debt", 0)
         clock.tick(60)
         check_win(player)
